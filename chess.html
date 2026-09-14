@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Zone - Chess</title>
+  <!-- Load Chess.js engine for legal chess move calculations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background: #0f172a;
+      color: #ffffff;
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 12px;
+    }
+    .wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 460px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 26px;
+      margin-bottom: 4px;
+    }
+    .status-text {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #334155;
+      font-weight: 600;
+      color: #38bdf8;
+      margin-bottom: 14px;
+      font-size: 13px;
+    }
+
+    /* Chessboard Container */
+    #board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      width: min(90vw, 420px);
+      height: min(90vw, 420px);
+      border: 4px solid #334155;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+    }
+    .square {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(28px, 7vw, 38px);
+      cursor: pointer;
+      position: relative;
+    }
+    .light { background: #e2e8f0; color: #000; }
+    .dark { background: #64748b; color: #000; }
+    .selected { background: #fde047 !important; }
+    .highlight-move {
+      background: #86efac !important;
+    }
+    .highlight-move::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: rgba(34, 197, 94, 0.6);
+      border-radius: 50%;
+    }
+
+    /* Actions */
+    .controls {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      margin-top: 16px;
+    }
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: 0;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: #38bdf8; color: #0f172a; }
+    .btn-secondary { background: #334155; color: #fff; text-decoration: none; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
+
+    /* Difficulty Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+    }
+    .modal-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      padding: 26px 20px;
+      max-width: 360px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+    .modal-box h2 { font-size: 22px; margin-bottom: 6px; }
+    .modal-box p { color: #94a3b8; font-size: 14px; margin-bottom: 18px; }
+    .diff-list { display: flex; flex-direction: column; gap: 10px; }
+    .diff-btn {
+      padding: 13px;
+      border-radius: 12px;
+      border: 0;
+      font-size: 15px;
+      font-weight: bold;
+      color: #fff;
+      cursor: pointer;
+    }
+    .diff-btn.easy { background: #10b981; }
+    .diff-btn.medium { background: #f59e0b; }
+    .diff-btn.hard { background: #ef4444; }
+  </style>
+</head>
+<body>
+
+  <!-- Difficulty Selection Modal -->
+  <div id="diffModal" class="modal-overlay">
+    <div class="modal-box">
+      <h2>Select Difficulty</h2>
+      <p>Play with White pieces. Take your time—no timer!</p>
+      <div class="diff-list">
+        <button class="diff-btn easy" onclick="startGame('easy')">🟢 Easy (Random Moves)</button>
+        <button class="diff-btn medium" onclick="startGame('medium')">🟡 Moderate (Greedy/Attacking)</button>
+        <button class="diff-btn hard" onclick="startGame('hard')">🔴 Hard (Minimax Engine)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrapper">
+    <h1>♟️ Saloon Chess</h1>
+    <div class="status-text" id="statusMessage">Choose difficulty to start</div>
+    <div class="status-badge" id="difficultyBadge">Difficulty: None</div>
+
+    <div id="board"></div>
+
+    <div class="controls">
+      <button class="btn btn-primary" onclick="showDifficultyModal()">New Game</button>
+      <a class="btn btn-secondary" href="index.html">← Back to Menu</a>
+    </div>
+  </div>
+
+  <script>
+    const chess = new Chess();
+    const boardEl = document.getElementById("board");
+    const statusMessage = document.getElementById("statusMessage");
+    const diffBadge = document.getElementById("difficultyBadge");
+    const diffModal = document.getElementById("diffModal");
+
+    let currentDifficulty = "easy";
+    let selectedSquare = null;
+
+    // Unicode symbols for chess pieces
+    const pieceSymbols = {
+      'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚',
+      'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔'
+    };
+
+    // Standard piece values for evaluation
+    const pieceValues = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+
+    function showDifficultyModal() {
+      diffModal.style.display = "flex";
+    }
+
+    function startGame(level) {
+      currentDifficulty = level;
+      diffModal.style.display = "none";
+      chess.reset();
+      selectedSquare = null;
+      
+      const names = { easy: "🟢 Easy", medium: "🟡 Moderate", hard: "🔴 Hard" };
+      diffBadge.textContent = "Difficulty: " + names[level] + " (Untimed)";
+      statusMessage.textContent = "Your turn (White)";
+      renderBoard();
+    }
+
+    function renderBoard() {
+      boardEl.innerHTML = "";
+      const boardState = chess.board();
+
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const squareName = String.fromCharCode(97 + c) + (8 - r);
+          const squareDiv = document.createElement("div");
+          const isLight = (r + c) % 2 === 0;
+          squareDiv.className = `square ${isLight ? 'light' : 'dark'}`;
+          squareDiv.dataset.square = squareName;
+
+          const piece = boardState[r][c];
+          if (piece) {
+            const symKey = piece.color === 'w' ? piece.type.toUpperCase() : piece.type.toLowerCase();
+            squareDiv.textContent = pieceSymbols[symKey];
+            // Style pieces cleanly
+            if (piece.color === 'w') {
+              squareDiv.style.color = "#ffffff";
+              squareDiv.style.textShadow = "0 1px 4px #000, 0 0 2px #000";
+            } else {
+              squareDiv.style.color = "#111827";
+            }
+          }
+
+          if (selectedSquare === squareName) {
+            squareDiv.classList.add("selected");
+          }
+
+          squareDiv.addEventListener("click", () => handleSquareClick(squareName));
+          boardEl.appendChild(squareDiv);
+        }
+      }
+    }
+
+    function handleSquareClick(square) {
+      if (chess.game_over() || chess.turn() !== 'w') return;
+
+      // If clicked on current selected square, unselect
+      if (selectedSquare === square) {
+        selectedSquare = null;
+        renderBoard();
+        return;
+      }
+
+      // If a square is already selected, try moving
+      if (selectedSquare) {
+        const move = chess.move({
+          from: selectedSquare,
+          to: square,
+          promotion: 'q'
+        });
+
+        if (move) {
+          selectedSquare = null;
+          renderBoard();
+          checkGameOver();
+
+          // AI's turn if game isn't over
+          if (!chess.game_over()) {
+            statusMessage.textContent = "AI is calculating move...";
+            setTimeout(makeAIMove, 250);
+          }
+          return;
+        }
+      }
+
+      // Check if clicked square has a friendly (white) piece
+      const piece = chess.get(square);
+      if (piece && piece.color === 'w') {
+        selectedSquare = square;
+        renderBoard();
+        highlightValidMoves(square);
+      } else {
+        selectedSquare = null;
+        renderBoard();
+      }
+    }
+
+    function highlightValidMoves(square) {
+      const moves = chess.moves({ square: square, verbose: true });
+      moves.forEach(m => {
+        const targetSquareEl = document.querySelector(`[data-square="${m.to}"]`);
+        if (targetSquareEl) targetSquareEl.classList.add("highlight-move");
+      });
+    }
+
+    // AI DECISION LOGIC
+    function makeAIMove() {
+      if (chess.game_over()) return;
+
+      const moves = chess.moves({ verbose: true });
+      if (moves.length === 0) return;
+
+      let chosenMove = null;
+
+      if (currentDifficulty === 'easy') {
+        // Pure random moves (very blunder-prone)
+        chosenMove = moves[Math.floor(Math.random() * moves.length)];
+      } else if (currentDifficulty === 'medium') {
+        // Greedy capture logic (moderate level)
+        moves.sort((a, b) => {
+          let valA = a.captured ? pieceValues[a.captured] : 0;
+          let valB = b.captured ? pieceValues[b.captured] : 0;
+          return valB - valA;
+        });
+        chosenMove = moves[0];
+      } else if (currentDifficulty === 'hard') {
+        // Minimax 2-ply search with piece-value evaluation
+        let bestScore = -Infinity;
+        for (const m of moves) {
+          chess.move(m);
+          let score = -minimax(2, -Infinity, Infinity, false);
+          chess.undo();
+          if (score > bestScore) {
+            bestScore = score;
+            chosenMove = m;
+          }
+        }
+      }
+
+      chess.move(chosenMove || moves[0]);
+      renderBoard();
+      statusMessage.textContent = "Your turn (White)";
+      checkGameOver();
+    }
+
+    // Minimax evaluation for Hard Mode
+    function minimax(depth, alpha, beta, isMaximizing) {
+      if (depth === 0 || chess.game_over()) {
+        return evaluateBoard();
+      }
+
+      const moves = chess.moves({ verbose: true });
+      if (isMaximizing) {
+        let maxEval = -Infinity;
+        for (const move of moves) {
+          chess.move(move);
+          let ev = minimax(depth - 1, alpha, beta, false);
+          chess.undo();
+          maxEval = Math.max(maxEval, ev);
+          alpha = Math.max(alpha, ev);
+          if (beta <= alpha) break;
+        }
+        return maxEval;
+      } else {
+        let minEval = Infinity;
+        for (const move of moves) {
+          chess.move(move);
+          let ev = minimax(depth - 1, alpha, beta, true);
+          chess.undo();
+          minEval = Math.min(minEval, ev);
+          beta = Math.min(beta, ev);
+          if (beta <= alpha) break;
+        }
+        return minEval;
+      }
+    }
+
+    function evaluateBoard() {
+      let total = 0;
+      const board = chess.board();
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const piece = board[r][c];
+          if (piece) {
+            const val = pieceValues[piece.type] || 0;
+            total += (piece.color === 'b' ? val : -val);
+          }
+        }
+      }
+      return total;
+    }
+
+    function checkGameOver() {
+      if (chess.in_checkmate()) {
+        const winner = chess.turn() === 'w' ? 'Black (AI) wins by Checkmate!' : 'White (You) win by Checkmate!';
+        statusMessage.textContent = `🏆 ${winner}`;
+      } else if (chess.in_draw()) {
+        statusMessage.textContent = "🤝 Game Draw / Stalemate!";
+      } else if (chess.in_check()) {
+        statusMessage.textContent = `⚠️ Check on ${chess.turn() === 'w' ? 'White' : 'Black'}!`;
+      }
+    }
+
+    // Initialize with modal prompt
+    showDifficultyModal();
+  </script>
+</body>
+</html>
