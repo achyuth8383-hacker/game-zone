@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Saloon Bottle Shooter</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background: #05070d;
+      color: #fff;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      touch-action: manipulation;
+      cursor: crosshair;
+    }
+
+    /* Scene Viewport */
+    #stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(to bottom, #111420 0%, #1e1b18 45%, #100b08 100%);
+      overflow: hidden;
+    }
+
+    /* Spotlight Overhead Lights */
+    .spotlights {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 60%;
+      background: radial-gradient(circle at 20% 0%, rgba(255,230,170,0.2) 0%, transparent 40%),
+                  radial-gradient(circle at 50% 0%, rgba(255,230,170,0.25) 0%, transparent 40%),
+                  radial-gradient(circle at 80% 0%, rgba(255,230,170,0.2) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    /* Back Wall Shelves */
+    .back-shelf {
+      position: absolute;
+      top: 32%;
+      left: 0;
+      width: 100%;
+      height: 14px;
+      background: #2a1810;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.8);
+      border-bottom: 3px solid #140c08;
+    }
+
+    /* Wooden Bar Counter (Perspective) */
+    .bar-counter {
+      position: absolute;
+      top: 48%;
+      left: 0;
+      width: 100%;
+      height: 18%;
+      background: linear-gradient(to bottom, #78350f, #451a03 70%, #291003);
+      border-top: 6px solid #92400e;
+      box-shadow: inset 0 6px 15px rgba(255,255,255,0.15), 0 12px 35px rgba(0,0,0,0.9);
+      z-index: 10;
+    }
+
+    /* Counter Stools */
+    .stools-row {
+      position: absolute;
+      top: 55%;
+      left: 0;
+      width: 100%;
+      display: flex;
+      justify-content: space-around;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .stool {
+      width: 50px;
+      height: 120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .stool-cushion {
+      width: 50px;
+      height: 18px;
+      background: radial-gradient(ellipse, #dc2626, #7f1d1d);
+      border-radius: 50%;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.7);
+    }
+    .stool-leg {
+      width: 6px;
+      height: 80px;
+      background: #71717a;
+    }
+    .stool-base {
+      width: 40px;
+      height: 10px;
+      background: #52525b;
+      border-radius: 50%;
+    }
+
+    /* Bottles on counter */
+    #bottleContainer {
+      position: absolute;
+      top: 48%;
+      left: 0;
+      width: 100%;
+      height: 0;
+      z-index: 20;
+    }
+    .bottle {
+      position: absolute;
+      bottom: 0;
+      width: 28px;
+      height: 72px;
+      cursor: crosshair;
+      transform-origin: bottom center;
+      transition: transform 0.1s ease;
+    }
+    .bottle-body {
+      position: absolute;
+      bottom: 0;
+      width: 28px;
+      height: 48px;
+      border-radius: 6px 6px 2px 2px;
+      box-shadow: inset -4px 0 6px rgba(0,0,0,0.4), inset 3px 0 6px rgba(255,255,255,0.4);
+    }
+    .bottle-neck {
+      position: absolute;
+      bottom: 44px;
+      left: 9px;
+      width: 10px;
+      height: 26px;
+      border-radius: 3px 3px 0 0;
+    }
+    .green { background: rgba(34, 197, 94, 0.85); }
+    .amber { background: rgba(217, 119, 6, 0.85); }
+    .blue  { background: rgba(14, 165, 233, 0.85); }
+    .red   { background: rgba(239, 68, 68, 0.85); }
+
+    /* HUD Top Bar */
+    .hud-bar {
+      position: absolute;
+      top: 16px;
+      left: 0;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 24px;
+      z-index: 100;
+      pointer-events: none;
+    }
+    .hud-chip {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(8px);
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+    .hud-chip span { color: #38bdf8; margin-left: 6px; font-size: 18px; }
+    .back-btn {
+      pointer-events: auto;
+      text-decoration: none;
+      color: #94a3b8;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.15);
+      font-weight: bold;
+    }
+
+    /* First-Person Handgun */
+    #gunArm {
+      position: absolute;
+      bottom: -40px;
+      right: 18%;
+      width: 240px;
+      height: 240px;
+      pointer-events: none;
+      z-index: 50;
+      transform-origin: 70% 90%;
+      transition: transform 0.05s ease-out;
+    }
+    .gun-barrel {
+      position: absolute;
+      top: 40px;
+      left: 20px;
+      width: 140px;
+      height: 38px;
+      background: linear-gradient(to bottom, #475569, #1e293b 60%, #0f172a);
+      border-radius: 5px;
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.4);
+    }
+    .gun-handle {
+      position: absolute;
+      top: 65px;
+      right: 50px;
+      width: 55px;
+      height: 110px;
+      background: #78350f;
+      transform: rotate(-25deg);
+      border-radius: 6px;
+      border: 3px solid #451a03;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.7);
+    }
+    .hand-grip {
+      position: absolute;
+      bottom: 20px;
+      right: 40px;
+      width: 80px;
+      height: 80px;
+      background: #d97706;
+      border-radius: 50%;
+      box-shadow: inset -5px -5px 12px rgba(0,0,0,0.4);
+    }
+    .muzzle-flash {
+      position: absolute;
+      top: 15px;
+      left: -40px;
+      width: 70px;
+      height: 70px;
+      background: radial-gradient(circle, #fff, #facc15 40%, transparent 70%);
+      opacity: 0;
+      border-radius: 50%;
+      filter: blur(2px);
+    }
+
+    /* Recoil Animation */
+    .recoil {
+      animation: shootRecoil 0.15s ease-out;
+    }
+    @keyframes shootRecoil {
+      0% { transform: translateY(0) rotate(0deg); }
+      40% { transform: translateY(-24px) rotate(-14deg); }
+      100% { transform: translateY(0) rotate(0deg); }
+    }
+
+    /* Crosshair HUD pointer */
+    #reticle {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border: 2px solid rgba(255, 255, 255, 0.7);
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      z-index: 90;
+    }
+    #reticle::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 4px;
+      background: #ef4444;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Glass Fragments */
+    .shard {
+      position: absolute;
+      pointer-events: none;
+      border-radius: 2px;
+      z-index: 25;
+      animation: flyShard 0.6s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
+    }
+    @keyframes flyShard {
+      0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+      100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
+    }
+
+    /* Overlay Screen */
+    #centerOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.65);
+      z-index: 200;
+    }
+    #startPromptBtn {
+      padding: 16px 36px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 20px;
+      font-weight: 800;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      box-shadow: 0 10px 25px rgba(239, 68, 68, 0.4);
+    }
+    #startPromptBtn:active { transform: scale(0.96); }
+  </style>
+</head>
+<body>
+
+  <div id="stage">
+    <div class="spotlights"></div>
+    <div class="back-shelf"></div>
+
+    <!-- HUD -->
+    <div class="hud-bar">
+      <a class="back-btn" href="index.html">← Menu</a>
+      <div class="hud-chip">SCORE: <span id="scoreText">0</span></div>
+      <div class="hud-chip">BOTTLES LEFT: <span id="bottlesLeft">8</span></div>
+      <div class="hud-chip">TIMER: <span id="timerText">25s</span></div>
+    </div>
+
+    <!-- Counter & Bottles -->
+    <div id="bottleContainer"></div>
+    <div class="bar-counter"></div>
+
+    <!-- Stools -->
+    <div class="stools-row">
+      <div class="stool"><div class="stool-cushion"></div><div class="stool-leg"></div><div class="stool-base"></div></div>
+      <div class="stool"><div class="stool-cushion"></div><div class="stool-leg"></div><div class="stool-base"></div></div>
+      <div class="stool"><div class="stool-cushion"></div><div class="stool-leg"></div><div class="stool-base"></div></div>
+      <div class="stool"><div class="stool-cushion"></div><div class="stool-leg"></div><div class="stool-base"></div></div>
+      <div class="stool"><div class="stool-cushion"></div><div class="stool-leg"></div><div class="stool-base"></div></div>
+    </div>
+
+    <!-- FPS Gun Arm -->
+    <div id="gunArm">
+      <div class="muzzle-flash" id="flash"></div>
+      <div class="gun-barrel"></div>
+      <div class="gun-handle"></div>
+      <div class="hand-grip"></div>
+    </div>
+
+    <!-- Crosshair -->
+    <div id="reticle"></div>
+
+    <!-- Start / Game Over Screen -->
+    <div id="centerOverlay">
+      <h1 id="overlayTitle" style="font-size: 38px; margin-bottom: 12px;">🍾 SALOON SHOOTOUT</h1>
+      <p id="overlaySub" style="color: #94a3b8; margin-bottom: 24px;">Aim and smash every bottle on the bar counter!</p>
+      <button id="startPromptBtn">TAP TO PLAY</button>
+    </div>
+  </div>
+
+  <script>
+    const stage = document.getElementById("stage");
+    const container = document.getElementById("bottleContainer");
+    const gunArm = document.getElementById("gunArm");
+    const flash = document.getElementById("flash");
+    const reticle = document.getElementById("reticle");
+    const scoreText = document.getElementById("scoreText");
+    const bottlesLeftText = document.getElementById("bottlesLeft");
+    const timerText = document.getElementById("timerText");
+    const centerOverlay = document.getElementById("centerOverlay");
+    const overlayTitle = document.getElementById("overlayTitle");
+    const overlaySub = document.getElementById("overlaySub");
+    const startPromptBtn = document.getElementById("startPromptBtn");
+
+    let isPlaying = false;
+    let score = 0;
+    let timeLeft = 25;
+    let gameLoopTimer = null;
+    let totalBottles = 8;
+    const colors = ["green", "amber", "blue", "red"];
+
+    // Web Audio Gun & Shatter Sound Synthesizer
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playGunSound() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(280, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.7, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.12);
+    }
+
+    function playShatterSound() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(1200 + Math.random()*600, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.18);
+      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.18);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.18);
+    }
+
+    // Aim Crosshair & Angle Gun Arm
+    function updateAim(x, y) {
+      reticle.style.left = x + "px";
+      reticle.style.top = y + "px";
+
+      const gunRect = gunArm.getBoundingClientRect();
+      const originX = gunRect.left + gunRect.width * 0.7;
+      const originY = gunRect.top + gunRect.height * 0.9;
+      const angle = Math.atan2(y - originY, x - originX) * (180 / Math.PI) + 155;
+      gunArm.style.transform = `rotate(${Math.max(-35, Math.min(25, angle))}deg)`;
+    }
+
+    window.addEventListener("pointermove", (e) => {
+      updateAim(e.clientX, e.clientY);
+    });
+
+    // Populate Bottles on Bar
+    function setupBottles() {
+      container.innerHTML = "";
+      totalBottles = 8;
+      bottlesLeftText.innerText = totalBottles;
+
+      const spacing = window.innerWidth / (totalBottles + 1);
+      for (let i = 1; i <= totalBottles; i++) {
+        const bottle = document.createElement("div");
+        bottle.className = "bottle";
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        bottle.innerHTML = `
+          <div class="bottle-neck ${color}"></div>
+          <div class="bottle-body ${color}"></div>
+        `;
+        bottle.style.left = (spacing * i - 14) + "px";
+
+        bottle.addEventListener("pointerdown", (e) => {
+          e.stopPropagation();
+          hitBottle(bottle, e.clientX, e.clientY, color);
+        });
+
+        container.appendChild(bottle);
+      }
+    }
+
+    // Shatter Particle Effect
+    function createGlassShards(x, y, colorClass) {
+      for (let i = 0; i < 12; i++) {
+        const shard = document.createElement("div");
+        shard.className = `shard ${colorClass}`;
+        shard.style.left = x + "px";
+        shard.style.top = y + "px";
+        shard.style.width = (4 + Math.random() * 8) + "px";
+        shard.style.height = (4 + Math.random() * 8) + "px";
+
+        const dx = (Math.random() - 0.5) * 160 + "px";
+        const dy = (Math.random() * 120 + 20) + "px";
+        const rot = (Math.random() * 360) + "deg";
+
+        shard.style.setProperty("--dx", dx);
+        shard.style.setProperty("--dy", dy);
+        shard.style.setProperty("--rot", rot);
+
+        stage.appendChild(shard);
+        setTimeout(() => shard.remove(), 600);
+      }
+    }
+
+    // Fire Gun Mechanics
+    function shootGun() {
+      playGunSound();
+      gunArm.classList.remove("recoil");
+      void gunArm.offsetWidth;
+      gunArm.classList.add("recoil");
+
+      flash.style.opacity = "1";
+      setTimeout(() => flash.style.opacity = "0", 60);
+    }
+
+    function hitBottle(bottle, x, y, colorClass) {
+      if (!isPlaying) return;
+      shootGun();
+      playShatterSound();
+      createGlassShards(x, y, colorClass);
+      bottle.remove();
+
+      score += 100;
+      totalBottles--;
+      scoreText.innerText = score;
+      bottlesLeftText.innerText = totalBottles;
+
+      if (totalBottles <= 0) {
+        setTimeout(() => setupBottles(), 400);
+      }
+    }
+
+    // Shoot anywhere on stage (Miss Shot)
+    stage.addEventListener("pointerdown", (e) => {
+      if (!isPlaying || e.target.closest(".hud-bar") || e.target.closest("#centerOverlay")) return;
+      shootGun();
+    });
+
+    // Start Game Loop
+    function startGame() {
+      score = 0;
+      timeLeft = 25;
+      isPlaying = true;
+      scoreText.innerText = score;
+      timerText.innerText = timeLeft + "s";
+      centerOverlay.style.display = "none";
+
+      setupBottles();
+
+      clearInterval(gameLoopTimer);
+      gameLoopTimer = setInterval(() => {
+        timeLeft--;
+        timerText.innerText = timeLeft + "s";
+        if (timeLeft <= 0) {
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function endGame() {
+      clearInterval(gameLoopTimer);
+      isPlaying = false;
+      centerOverlay.style.display = "flex";
+      overlayTitle.innerText = "TIME'S UP!";
+      overlaySub.innerText = `Final Score: ${score} points!`;
+      startPromptBtn.innerText = "PLAY AGAIN";
+    }
+
+    startPromptBtn.addEventListener("click", startGame);
+  </script>
+</body>
+</html>
