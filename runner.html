@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Pixel Runner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #111827;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      touch-action: manipulation;
+    }
+    h2 { margin-bottom: 8px; }
+    p { margin-bottom: 15px; color: #9ca3af; font-size: 14px; }
+    canvas {
+      background: #1f2937;
+      border: 2px solid #38bdf8;
+      border-radius: 12px;
+      max-width: 95vw;
+    }
+    .score-board {
+      margin-top: 15px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🏃 Pixel Runner</h2>
+  <p>Tap screen or press SPACE to jump!</p>
+
+  <canvas id="gameCanvas" width="500" height="200"></canvas>
+  <div class="score-board">Score: <span id="scoreText">0</span> | Best: <span id="bestText">0</span></div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreText = document.getElementById("scoreText");
+    const bestText = document.getElementById("bestText");
+
+    let isPlaying = false, score = 0, highScore = 0, speed = 5;
+    const player = { x: 40, y: 150, w: 25, h: 35, vy: 0, gravity: 0.7, jump: -11, ground: true };
+    let blocks = [], timer = 0;
+
+    function jump() {
+      if (!isPlaying) { reset(); return; }
+      if (player.ground) { player.vy = player.jump; player.ground = false; }
+    }
+
+    window.addEventListener("keydown", (e) => { if (e.code === "Space") jump(); });
+    window.addEventListener("touchstart", (e) => { e.preventDefault(); jump(); }, { passive: false });
+    canvas.addEventListener("click", jump);
+
+    function reset() {
+      isPlaying = true; score = 0; speed = 5; blocks = [];
+      player.y = 150; player.vy = 0; player.ground = true;
+      scoreText.innerText = score;
+    }
+
+    function update() {
+      if (!isPlaying) return;
+      player.vy += player.gravity;
+      player.y += player.vy;
+      if (player.y >= 150) { player.y = 150; player.vy = 0; player.ground = true; }
+
+      timer++;
+      if (timer > 70) {
+        blocks.push({ x: canvas.width, y: 160, w: 18, h: 25 });
+        timer = 0;
+      }
+
+      for (let i = blocks.length - 1; i >= 0; i--) {
+        let b = blocks[i];
+        b.x -= speed;
+        if (player.x < b.x + b.w && player.x + player.w > b.x && player.y < b.y + b.h && player.y + player.h > b.y) {
+          isPlaying = false;
+          if (score > highScore) { highScore = score; bestText.innerText = highScore; }
+        }
+        if (b.x + b.w < 0) {
+          blocks.splice(i, 1);
+          score += 10;
+          scoreText.innerText = score;
+          if (score % 50 === 0) speed += 0.3;
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "#4b5563";
+      ctx.beginPath(); ctx.moveTo(0, 185); ctx.lineTo(canvas.width, 185); ctx.stroke();
+
+      ctx.fillStyle = "#38bdf8";
+      ctx.fillRect(player.x, player.y, player.w, player.h);
+
+      ctx.fillStyle = "#ef4444";
+      blocks.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+
+      if (!isPlaying) {
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 20px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(score > 0 ? "GAME OVER" : "TAP TO START", canvas.width / 2, 95);
+      }
+    }
+
+    function loop() { update(); draw(); requestAnimationFrame(loop); }
+    loop();
+  </script>
+</body>
+</html>
