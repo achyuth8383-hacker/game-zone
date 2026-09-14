@@ -23,7 +23,7 @@
     }
     h1 {
       margin-bottom: 8px;
-      font-size: 36px;
+      font-size: 38px;
       letter-spacing: -0.5px;
     }
     .subtitle {
@@ -35,42 +35,46 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 24px;
-      max-width: 700px;
+      gap: 20px;
+      max-width: 960px;
       width: 100%;
     }
     .card {
       background: #1e293b;
       border: 1px solid #334155;
       border-radius: 20px;
-      padding: 32px 24px;
-      flex: 1 1 280px;
-      max-width: 320px;
+      padding: 28px 20px;
+      flex: 1 1 260px;
+      max-width: 300px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
       text-align: center;
+      transition: transform 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px);
     }
     .card h2 {
-      font-size: 24px;
+      font-size: 22px;
       margin-bottom: 12px;
     }
     .card p {
       color: #94a3b8;
       font-size: 14px;
       line-height: 1.5;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
     .btn {
       display: inline-block;
-      padding: 14px 24px;
+      padding: 13px 20px;
       background: #38bdf8;
       color: #0f172a;
       text-decoration: none;
       font-weight: 700;
       border-radius: 12px;
-      font-size: 16px;
+      font-size: 15px;
       transition: background 0.15s ease, transform 0.15s ease;
     }
     .btn:hover {
@@ -86,22 +90,31 @@
   <p class="subtitle">Choose a game to play:</p>
 
   <div class="grid">
-    <!-- Game 1 Card -->
+    <!-- Game 1 -->
     <div class="card">
       <div>
         <h2>🎯 Target Rush</h2>
-        <p>Tap glowing targets as fast as you can before the 20-second timer runs out!</p>
+        <p>Tap the glowing targets as fast as you can before the 20-second timer runs out!</p>
       </div>
       <a class="btn" href="game.html">Play Now</a>
     </div>
 
-    <!-- Game 2 Card -->
+    <!-- Game 2 -->
     <div class="card">
       <div>
         <h2>🏃 Pixel Runner</h2>
-        <p>Jump over moving obstacles and see how far you can run without crashing!</p>
+        <p>Jump over incoming obstacles and run as far as possible without crashing!</p>
       </div>
       <a class="btn" href="runner.html">Play Now</a>
+    </div>
+
+    <!-- Game 3 -->
+    <div class="card">
+      <div>
+        <h2>🍾 Bottle Shooter</h2>
+        <p>Aim your gun and smash all the bottles lined up on the bar counter!</p>
+      </div>
+      <a class="btn" href="bottles.html">Play Now</a>
     </div>
   </div>
 
