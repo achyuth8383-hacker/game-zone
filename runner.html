@@ -5,40 +5,68 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Pixel Runner</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
     body {
       background: #111827;
-      color: #fff;
-      font-family: sans-serif;
+      color: #ffffff;
+      font-family: system-ui, -apple-system, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
       touch-action: manipulation;
+      padding: 16px;
     }
-    h2 { margin-bottom: 8px; }
-    p { margin-bottom: 15px; color: #9ca3af; font-size: 14px; }
+    h2 {
+      margin-bottom: 8px;
+      font-size: 26px;
+    }
+    p {
+      margin-bottom: 14px;
+      color: #9ca3af;
+      font-size: 14px;
+      text-align: center;
+    }
     canvas {
       background: #1f2937;
       border: 2px solid #38bdf8;
       border-radius: 12px;
       max-width: 95vw;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
     }
     .score-board {
-      margin-top: 15px;
-      font-size: 18px;
+      margin-top: 14px;
+      font-size: 16px;
       font-weight: bold;
+    }
+    .back-btn {
+      margin-top: 18px;
+      color: #38bdf8;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back-btn:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
 
   <h2>🏃 Pixel Runner</h2>
-  <p>Tap screen or press SPACE to jump!</p>
+  <p>Tap the screen, click, or press SPACE to jump!</p>
 
-  <canvas id="gameCanvas" width="500" height="200"></canvas>
-  <div class="score-board">Score: <span id="scoreText">0</span> | Best: <span id="bestText">0</span></div>
+  <canvas id="gameCanvas" width="500" height="220"></canvas>
+
+  <div class="score-board">
+    Score: <span id="scoreText">0</span> | Best: <span id="bestText">0</span>
+  </div>
+
+  <a class="back-btn" href="index.html">← Back to Menu</a>
 
   <script>
     const canvas = document.getElementById("gameCanvas");
@@ -46,76 +74,158 @@
     const scoreText = document.getElementById("scoreText");
     const bestText = document.getElementById("bestText");
 
-    let isPlaying = false, score = 0, highScore = 0, speed = 5;
-    const player = { x: 40, y: 150, w: 25, h: 35, vy: 0, gravity: 0.7, jump: -11, ground: true };
-    let blocks = [], timer = 0;
+    let isPlaying = false;
+    let score = 0;
+    let highScore = Number(localStorage.getItem("pixelRunnerBest") || 0);
+    bestText.innerText = highScore;
+
+    let speed = 5;
+    const player = {
+      x: 40,
+      y: 160,
+      w: 26,
+      h: 36,
+      vy: 0,
+      gravity: 0.7,
+      jump: -11.5,
+      ground: true
+    };
+
+    let blocks = [];
+    let timer = 0;
 
     function jump() {
-      if (!isPlaying) { reset(); return; }
-      if (player.ground) { player.vy = player.jump; player.ground = false; }
+      if (!isPlaying) {
+        resetGame();
+        return;
+      }
+      if (player.ground) {
+        player.vy = player.jump;
+        player.ground = false;
+      }
     }
 
-    window.addEventListener("keydown", (e) => { if (e.code === "Space") jump(); });
-    window.addEventListener("touchstart", (e) => { e.preventDefault(); jump(); }, { passive: false });
-    canvas.addEventListener("click", jump);
+    // Controls: Keyboard, Click, Touch
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" || e.code === "ArrowUp") {
+        e.preventDefault();
+        jump();
+      }
+    });
 
-    function reset() {
-      isPlaying = true; score = 0; speed = 5; blocks = [];
-      player.y = 150; player.vy = 0; player.ground = true;
+    canvas.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      jump();
+    });
+
+    function resetGame() {
+      isPlaying = true;
+      score = 0;
+      speed = 5;
+      blocks = [];
+      player.y = 160;
+      player.vy = 0;
+      player.ground = true;
       scoreText.innerText = score;
     }
 
     function update() {
       if (!isPlaying) return;
+
+      // Gravity & Jump Physics
       player.vy += player.gravity;
       player.y += player.vy;
-      if (player.y >= 150) { player.y = 150; player.vy = 0; player.ground = true; }
 
+      if (player.y >= 160) {
+        player.y = 160;
+        player.vy = 0;
+        player.ground = true;
+      }
+
+      // Spawn Obstacles
       timer++;
-      if (timer > 70) {
-        blocks.push({ x: canvas.width, y: 160, w: 18, h: 25 });
+      if (timer > 75) {
+        blocks.push({
+          x: canvas.width,
+          y: 172,
+          w: 18,
+          h: 24
+        });
         timer = 0;
       }
 
+      // Move & Check Obstacles
       for (let i = blocks.length - 1; i >= 0; i--) {
         let b = blocks[i];
         b.x -= speed;
-        if (player.x < b.x + b.w && player.x + player.w > b.x && player.y < b.y + b.h && player.y + player.h > b.y) {
+
+        // Collision detection
+        if (
+          player.x < b.x + b.w &&
+          player.x + player.w > b.x &&
+          player.y < b.y + b.h &&
+          player.y + player.h > b.y
+        ) {
           isPlaying = false;
-          if (score > highScore) { highScore = score; bestText.innerText = highScore; }
+          if (score > highScore) {
+            highScore = score;
+            localStorage.setItem("pixelRunnerBest", highScore);
+            bestText.innerText = highScore;
+          }
         }
+
+        // Score increment when obstacle passes
         if (b.x + b.w < 0) {
           blocks.splice(i, 1);
           score += 10;
           scoreText.innerText = score;
-          if (score % 50 === 0) speed += 0.3;
+          if (score % 50 === 0) speed += 0.3; // Speed up gradually
         }
       }
     }
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = "#4b5563";
-      ctx.beginPath(); ctx.moveTo(0, 185); ctx.lineTo(canvas.width, 185); ctx.stroke();
 
+      // Floor line
+      ctx.strokeStyle = "#4b5563";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 196);
+      ctx.lineTo(canvas.width, 196);
+      ctx.stroke();
+
+      // Draw Player
       ctx.fillStyle = "#38bdf8";
       ctx.fillRect(player.x, player.y, player.w, player.h);
 
+      // Draw Obstacles
       ctx.fillStyle = "#ef4444";
       blocks.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
 
+      // Start / Game Over Screen
       if (!isPlaying) {
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 20px sans-serif";
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 22px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(score > 0 ? "GAME OVER" : "TAP TO START", canvas.width / 2, 95);
+        ctx.fillText(score > 0 ? "GAME OVER" : "PIXEL RUNNER", canvas.width / 2, 95);
+
+        ctx.font = "15px sans-serif";
+        ctx.fillStyle = "#9ca3af";
+        ctx.fillText("Tap or press Space to Play", canvas.width / 2, 130);
       }
     }
 
-    function loop() { update(); draw(); requestAnimationFrame(loop); }
-    loop();
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
   </script>
 </body>
 </html>
