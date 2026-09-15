@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Game Zone - Pro Cricket Championship</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background: #060b13;
+      color: #fff;
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    #gameStage {
+      position: relative;
+      width: min(100vw, 440px);
+      height: min(100vh, 700px);
+      background: #111827;
+      overflow: hidden;
+      border-radius: 16px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+      border: 2px solid #1f2937;
+    }
+
+    /* 3D Stadium Canvas */
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Broadcast HUD */
+    .hud {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .scorecard {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+    }
+    .scorecard b {
+      font-size: 18px;
+      color: #38bdf8;
+      display: block;
+    }
+    .back-btn {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 8px 14px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 700;
+      height: fit-content;
+    }
+
+    /* Commentary / Action Banner */
+    #commentary {
+      position: absolute;
+      top: 75px;
+      width: 100%;
+      text-align: center;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.9);
+      pointer-events: none;
+      z-index: 20;
+      transition: transform 0.2s ease;
+    }
+    .cheer { color: #facc15; transform: scale(1.25); }
+    .groan { color: #ef4444; transform: scale(1.2); }
+
+    /* On-Screen Batting Controls */
+    .controls-panel {
+      position: absolute;
+      bottom: 16px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 20;
+    }
+    .shot-selectors {
+      display: flex;
+      gap: 8px;
+    }
+    .shot-btn {
+      flex: 1;
+      padding: 10px;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid #475569;
+      color: #cbd5e1;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .shot-btn.active {
+      background: #0284c7;
+      color: #fff;
+      border-color: #38bdf8;
+    }
+    .hit-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+      cursor: pointer;
+    }
+    .hit-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Modal / Popups */
+    .modal {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 100;
+      text-align: center;
+    }
+    .modal h2 { font-size: 26px; margin-bottom: 8px; }
+    .modal p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+    .action-btn {
+      padding: 14px 28px;
+      background: #38bdf8;
+      border: 0;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 16px;
+      color: #0f172a;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="gameStage">
+    <!-- Stadium Perspective Canvas -->
+    <canvas id="cricCanvas" width="440" height="700"></canvas>
+
+    <!-- Broadcast Scorecard -->
+    <div class="hud">
+      <div class="scorecard">
+        <span id="currentTeam">IND BATTING</span>
+        <b id="scoreBoard">0/0 (0.0)</b>
+        <span id="targetBoard" style="color:#facc15; font-size:11px;">Target: ---</span>
+      </div>
+      <a class="back-btn" href="index.html">← Menu</a>
+    </div>
+
+    <!-- Match Commentary Line -->
+    <div id="commentary">TAP 'HIT BALL' ON TIME!</div>
+
+    <!-- Batter Hit Controls -->
+    <div class="controls-panel">
+      <div class="shot-selectors">
+        <button class="shot-btn" id="shotOff" onclick="setShot('OFF')">OFF DRIVE</button>
+        <button class="shot-btn active" id="shotStraight" onclick="setShot('STRAIGHT')">STRAIGHT</button>
+        <button class="shot-btn" id="shotLeg" onclick="setShot('LEG')">LEG PULL</button>
+      </div>
+      <button class="hit-btn" id="swingBatBtn">🏏 SWING BAT</button>
+    </div>
+
+    <!-- Start / Result Overlay -->
+    <div class="modal" id="overlay">
+      <h2 id="modalTitle">🏆 CRICKET CHAMPIONSHIP</h2>
+      <p id="modalDesc">Team India vs Team Australia<br>1 Over (6 balls) per side. Hit boundaries and defend your score!</p>
+      <button class="action-btn" id="modalBtn" onclick="startInnings()">START MATCH</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("cricCanvas");
+    const ctx = canvas.getContext("2d");
+    const commentary = document.getElementById("commentary");
+    const scoreBoard = document.getElementById("scoreBoard");
+    const currentTeamEl = document.getElementById("currentTeam");
+    const targetBoard = document.getElementById("targetBoard");
+    const overlay = document.getElementById("overlay");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalDesc = document.getElementById("modalDesc");
+    const modalBtn = document.getElementById("modalBtn");
+    const swingBatBtn = document.getElementById("swingBatBtn");
+
+    // Audio Synthesizer: Crowd Roar, Disappointed Crowd "Nooo", Bat Crack
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playCrowdCheer() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      // White noise buffer for crowd celebration roar
+      const bufferSize = audioCtx.sampleRate * 1.8;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const whiteNoise = audioCtx.createBufferSource();
+      whiteNoise.buffer = buffer;
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 800;
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.8);
+
+      whiteNoise.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      whiteNoise.start();
+    }
+
+    function playCrowdGroan() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      // Descending sad frequency wave + low groaning rumble
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+      osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 1.2);
+
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.2);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 1.2);
+    }
+
+    function playBatCrack() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(450, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.9, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.08);
+    }
+
+    // Match State
+    let innings = 1; // 1 = Team 1 (User), 2 = Team 2 (Chase)
+    let runsTeam1 = 0, wicketsTeam1 = 0;
+    let runsTeam2 = 0, wicketsTeam2 = 0;
+    let ballsDelivered = 0;
+    const MAX_BALLS = 6; // 1 over match
+    let currentShot = "STRAIGHT";
+    let isBallActive = false;
+
+    // Ball 3D perspective simulation
+    let ball = {
+      x: 220,
+      y: 200,
+      z: 0,        // 0 (bowler release) to 1 (reaches crease)
+      radius: 4,
+      vy: 2.8,
+      active: false,
+      hit: false,
+      hitDx: 0,
+      hitDy: 0
+    };
+
+    function setShot(shot) {
+      currentShot = shot;
+      document.querySelectorAll('.shot-btn').forEach(b => b.classList.remove('active'));
+      if (shot === 'OFF') document.getElementById('shotOff').classList.add('active');
+      if (shot === 'STRAIGHT') document.getElementById('shotStraight').classList.add('active');
+      if (shot === 'LEG') document.getElementById('shotLeg').classList.add('active');
+    }
+
+    function startInnings() {
+      overlay.style.display = "none";
+      if (innings === 1) {
+        runsTeam1 = 0; wicketsTeam1 = 0; ballsDelivered = 0;
+        currentTeamEl.innerText = "IND BATTING (1st INNINGS)";
+        targetBoard.innerText = "Target: Setting Target";
+      } else {
+        ballsDelivered = 0;
+        currentTeamEl.innerText = "AUS BATTING (CHASING)";
+        targetBoard.innerText = `Target: Need ${runsTeam1 + 1} to Win`;
+      }
+      updateScoreboard();
+      setTimeout(deliverBall, 1000);
+    }
+
+    function updateScoreboard() {
+      const runs = innings === 1 ? runsTeam1 : runsTeam2;
+      const wickets = innings === 1 ? wicketsTeam1 : wicketsTeam2;
+      const overs = Math.floor(ballsDelivered / 6) + "." + (ballsDelivered % 6);
+      scoreBoard.innerText = `${runs}/${wickets} (${overs})`;
+    }
+
+    function deliverBall() {
+      if (ballsDelivered >= MAX_BALLS || (innings === 2 && runsTeam2 > runsTeam1)) {
+        endInnings();
+        return;
+      }
+
+      ball.x = 220 + (Math.random() * 20 - 10);
+      ball.y = 210;
+      ball.z = 0;
+      ball.radius = 4;
+      ball.active = true;
+      ball.hit = false;
+      isBallActive = true;
+      commentary.className = "";
+      commentary.innerText = "Bowler runs in...";
+    }
+
+    // Batter Swing
+    function swingBat() {
+      if (!isBallActive || !ball.active || ball.hit) return;
+
+      // Ball distance: Ideal batting hit zone is z between 0.70 and 0.88
+      if (ball.z >= 0.68 && ball.z <= 0.90) {
+        // Successful hit
+        ball.hit = true;
+        playBatCrack();
+
+        let timingQuality = Math.abs(ball.z - 0.79);
+        let runsScored = 0;
+
+        if (timingQuality < 0.04) {
+          // Perfect 6
+          runsScored = 6;
+          commentary.innerText = "💥 MAXIMUM! MASSIVE 6!";
+          commentary.className = "cheer";
+          playCrowdCheer();
+          ball.hitDy = -9;
+        } else if (timingQuality < 0.08) {
+          // 4 Runs
+          runsScored = 4;
+          commentary.innerText = "🔥 CRACKING SHOT! 4 RUNS!";
+          commentary.className = "cheer";
+          playCrowdCheer();
+          ball.hitDy = -6;
+        } else {
+          // 1 or 2 Runs
+          runsScored = Math.random() > 0.5 ? 2 : 1;
+          commentary.innerText = `⚡ Ticked away for ${runsScored} run(s)`;
+          ball.hitDy = -3;
+        }
+
+        // Shot direction bias
+        if (currentShot === 'OFF') ball.hitDx = -5;
+        else if (currentShot === 'LEG') ball.hitDx = 5;
+        else ball.hitDx = (Math.random() - 0.5) * 2;
+
+        recordRuns(runsScored);
+      } else if (ball.z > 0.90) {
+        // Late hit: missed completely / clean bowled
+        recordWicket("CLEAN BOWLED! 🚫 OUT!");
+      } else {
+        // Too early swing
+        commentary.innerText = "Early swing! Beaten by pace!";
+      }
+    }
+
+    function recordRuns(runs) {
+      if (innings === 1) runsTeam1 += runs;
+      else runsTeam2 += runs;
+      concludeDelivery();
+    }
+
+    function recordWicket(msg) {
+      ball.active = false;
+      ball.hit = false;
+      playCrowdGroan();
+      commentary.innerText = msg;
+      commentary.className = "groan";
+
+      if (innings === 1) wicketsTeam1++;
+      else wicketsTeam2++;
+      concludeDelivery();
+    }
+
+    function concludeDelivery() {
+      isBallActive = false;
+      ballsDelivered++;
+      updateScoreboard();
+
+      if (innings === 2 && runsTeam2 > runsTeam1) {
+        setTimeout(endInnings, 1200);
+        return;
+      }
+
+      if (ballsDelivered >= MAX_BALLS) {
+        setTimeout(endInnings, 1400);
+      } else {
+        setTimeout(deliverBall, 1600);
+      }
+    }
+
+    function endInnings() {
+      if (innings === 1) {
+        innings = 2;
+        modalTitle.innerText = "1st INNINGS COMPLETE";
+        modalDesc.innerText = `Team India scored ${runsTeam1}/${wicketsTeam1}.\nTeam Australia needs ${runsTeam1 + 1} runs to win off 6 balls!`;
+        modalBtn.innerText = "START CHASE";
+        overlay.style.display = "flex";
+      } else {
+        // Match Result
+        overlay.style.display = "flex";
+        if (runsTeam1 > runsTeam2) {
+          modalTitle.innerText = "🏆 TEAM INDIA WINS!";
+          modalDesc.innerText = `India: ${runsTeam1}/${wicketsTeam1}\nAustralia: ${runsTeam2}/${wicketsTeam2}\nIndia won by ${runsTeam1 - runsTeam2} runs!`;
+        } else if (runsTeam2 > runsTeam1) {
+          modalTitle.innerText = "🏆 TEAM AUSTRALIA WINS!";
+          modalDesc.innerText = `Australia: ${runsTeam2}/${wicketsTeam2}\nIndia: ${runsTeam1}/${wicketsTeam1}\nAustralia won by ${10 - wicketsTeam2} wickets!`;
+        } else {
+          modalTitle.innerText = "🤝 MATCH TIED!";
+          modalDesc.innerText = `Both teams scored ${runsTeam1} runs!`;
+        }
+        modalBtn.innerText = "PLAY NEW MATCH";
+        innings = 1;
+      }
+    }
+
+    // Continuous 3D Perspective Stadium Drawing Loop
+    function drawField() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Sky & Stadium Crowd Gradient
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, 200);
+      skyGrad.addColorStop(0, "#08101e");
+      skyGrad.addColorStop(0.7, "#14233c");
+      skyGrad.addColorStop(1, "#1e3a5f");
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, canvas.width, 220);
+
+      // Floodlights
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = "#38bdf8";
+      ctx.fillRect(30, 40, 40, 10);
+      ctx.fillRect(370, 40, 40, 10);
+      ctx.shadowBlur = 0;
+
+      // Grass Outfield
+      const grass = ctx.createLinearGradient(0, 200, 0, canvas.height);
+      grass.addColorStop(0, "#14532d");
+      grass.addColorStop(1, "#166534");
+      ctx.fillStyle = grass;
+      ctx.fillRect(0, 200, canvas.width, canvas.height - 200);
+
+      // 3D Perspective Pitch (WCC Angle)
+      ctx.fillStyle = "#b48c64";
+      ctx.beginPath();
+      ctx.moveTo(195, 210);
+      ctx.lineTo(245, 210);
+      ctx.lineTo(315, 600);
+      ctx.lineTo(125, 600);
+      ctx.closePath();
+      ctx.fill();
+
+      // Crease lines
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(150, 520);
+      ctx.lineTo(290, 520);
+      ctx.stroke();
+
+      // Distant Bowling Stumps
+      ctx.fillStyle = "#fef08a";
+      ctx.fillRect(217, 198, 6, 12);
+
+      // Near Batter Stumps
+      ctx.fillStyle = "#fef08a";
+      ctx.fillRect(212, 530, 16, 26);
+
+      // Batsman Silhouette
+      ctx.fillStyle = "#38bdf8";
+      ctx.fillRect(235, 480, 20, 40); // Body
+      ctx.fillStyle = "#facc15";
+      ctx.fillRect(240, 465, 12, 12); // Helmet
+      // Wooden Bat
+      ctx.fillStyle = "#d97706";
+      ctx.fillRect(248, 495, 6, 28);
+
+      // Ball Physics & Render
+      if (ball.active) {
+        if (!ball.hit) {
+          ball.z += 0.016;
+          ball.y += 4.8;
+          // Scale size as it gets closer
+          ball.radius = 4 + ball.z * 10;
+
+          // If ball crosses crease without swing
+          if (ball.z > 0.98) {
+            recordWicket("CLEAN BOWLED! 🚫 OUT!");
+          }
+        } else {
+          // Ball after hit
+          ball.x += ball.hitDx;
+          ball.y += ball.hitDy;
+          ball.radius = Math.max(3, ball.radius - 0.15);
+        }
+
+        // Draw Leather Cricket Ball
+        ctx.fillStyle = "#dc2626";
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, Math.max(3, ball.radius), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      requestAnimationFrame(drawField);
+    }
+
+    swingBatBtn.addEventListener("click", swingBat);
+    drawField();
+  </script>
+</body>
+</html>
